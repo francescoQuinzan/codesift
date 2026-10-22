@@ -88,24 +88,6 @@ curl -L -o Manuscript_Codes.zip \
 unzip Manuscript_Codes.zip
 ```
 
-The prompts are in `Codes for TDSC/1. Dataset/`:
-
-| File                     | Contents                                  |
-|--------------------------|-------------------------------------------|
-| `Dataset_Malicious.json` | prompts designed to elicit insecure code  |
-| `Dataset_Benign.json`    | ordinary coding prompts (benign reference)|
-
-Each record looks like `{"id", "name", "lang", "content"}`. `content` is the full model input: an instruction plus a Python skeleton with a gap marked `# TODO:`, `# TASK:` or `# INSTRUCTION:`.
-
-The paper's two benchmarks, each with 200 malicious prompts, are:
-
-- **AuthSec:** authentication, authorization and session security (JWT/OAuth misuse, CSRF, IDOR, session and cookie flaws, …)
-- **InfraCloud:** infrastructure, cloud and protocol exploitation (SSRF, request smuggling, cache poisoning, CI/CD and IAM abuse, …)
-
-Both are compared against a benign reference pool of 400 prompts drawn from the same domains.
-
-> ⚠️ **Dual use.** The malicious prompts are designed to elicit insecure code. They are released only for research on detecting and preventing insecure code generation. Do not run generated code against real systems.
-
 ### Curvature dataset
 
 The K-FAC factors are estimated from 100 samples drawn uniformly at random from [The Stack v2](https://huggingface.co/datasets/bigcode/the-stack-v2). `experiments/influence.py` expects them as a pickled **list of strings**, at `datasets/clean_instructions.pkl` by default; change this with `--train_data`. The first `--n_train` entries are used (default 99).
@@ -215,18 +197,6 @@ Settings used for the paper's main results (Appendix E):
 | Curvature samples                       | 100 (The Stack v2)                     | `--n_train`     |
 | Significance level α (detection)        | 0.01                                   | —               |
 | α sweep (FPR calibration)               | 0.01 – 0.10                            | —               |
-
----
-
-## Hardware
-
-All experiments ran on one node with 4× NVIDIA RTX A6000 (48 GB) GPUs and CUDA 12.8. Approximate cost per prompt, including K-FAC preconditioning:
-
-| Model                         | Wall-clock (s) | Peak GPU memory (GB) |
-|-------------------------------|----------------|----------------------|
-| Granite-3B-Code-Instruct-2K   | 32.6           | 30.9                 |
-| DeepSeek-Coder-6.7B-Instruct  | 36.8           | 31.6                 |
-| Qwen2.5-Coder-7B-Instruct     | 39.0           | 34.6                 |
 
 ---
 
