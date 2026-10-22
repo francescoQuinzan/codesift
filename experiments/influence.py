@@ -149,7 +149,7 @@ def parse_args(argv=None):
                    help="Pickle with the training examples used for the K-FAC / influence computation.")
     g.add_argument("--n_train", type=int, default=99,
                    help="Number of training examples to use (first N of --train_data).")
-    g.add_argument("--n_trials", type=int, default=10,
+    g.add_argument("--n_trials", type=int, default=25,
                    help="Number of answers to sample for the prompt.")
     g.add_argument("--print_answers", action="store_true",
                    help="Print every sampled answer.")

@@ -200,7 +200,7 @@ Settings used for the paper's main results (Appendix E):
 | Hyperparameter                          | Value                                  | Flag            |
 |-----------------------------------------|----------------------------------------|-----------------|
 | Upweighting factor ε                    | 1e-3                                   | `--epsilon`     |
-| Samples per prompt N                    | 25                                     | `--n_trials` ⚠️ default is 10 |
+| Samples per prompt N                    | 25                                     | `--n_trials`     |
 | Base K-FAC damping                      | 0.1                                    | `--damping`     |
 | Relative damping coefficient            | 0.1                                    | `--rel_eps`     |
 | Damping floor γ: Granite, DeepSeek      | 1e-3                                   | `--min_damping` |
