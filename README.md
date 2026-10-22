@@ -227,11 +227,16 @@ All experiments ran on one node with 4× NVIDIA RTX A6000 (48 GB) GPUs and CUDA 
 ## Citation
 
 ```bibtex
-@inproceedings{codesift2027,
-  title     = {Detecting Contaminated Code-Generation Prompt Batches via Influence Functions},
-  author    = {Anonymous},
-  booktitle = {Under review at the International Conference on Learning Representations (ICLR)},
-  year      = {2027}
+@article{DBLP:journals/corr/abs-2608-14303,
+  author       = {Francesco Quinzan and
+                  Noor Munir and
+                  Yishun Lu and
+                  Stephen J. Roberts},
+  title        = {Detecting Contaminated Code-Generation Prompt Batches via Influence
+                  Functions},
+  journal      = {CoRR},
+  volume       = {abs/2608.14303},
+  year         = {2026},
 }
 ```
 
