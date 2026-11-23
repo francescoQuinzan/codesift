@@ -227,6 +227,26 @@ def _get_reward_assets(
     return _REWARD_CACHE.get((model_id, dtype))
 
 
+def _is_quantized(model: torch.nn.Module) -> bool:
+    """True if the model was loaded with bitsandbytes 8-bit or 4-bit weights."""
+    return bool(
+        getattr(model, "is_loaded_in_8bit", False)
+        or getattr(model, "is_loaded_in_4bit", False)
+    )
+
+
+def _input_device(model: torch.nn.Module, requested=None):
+    """Device on which the model's inputs must live.
+
+    Quantized or sharded models are already placed by ``from_pretrained``, so use
+    the device of the input embeddings. Otherwise honour an explicit request and
+    fall back to the embeddings' device (the model was not moved in that case).
+    """
+    if _is_quantized(model) or requested is None:
+        return model.get_input_embeddings().weight.device
+    return requested
+
+
 # ----------------------------------------------------------------------------- #
 # Loss wrapper base class
 # ----------------------------------------------------------------------------- #
@@ -257,9 +277,7 @@ class LossWrapper(ABC):
         # Detect if the model was loaded with bitsandbytes quantization (8-bit or 4-bit).
         # Quantized models are already dispatched to devices during `from_pretrained`,
         # and cannot be moved or cast again with `.to()`.
-        if getattr(model, "is_loaded_in_8bit", False) or getattr(
-            model, "is_loaded_in_4bit", False
-        ):
+        if _is_quantized(model):
             self.model = model
         # For standard (non-quantized) models: move to the requested device.
         else:
@@ -276,21 +294,7 @@ class LossWrapper(ABC):
         # --------------------------- device / dtype --------------------------- #
         # Default to CUDA if available, otherwise CPU. Allow explicit override.
         # --- Pick the right target device for inputs ---
-        if getattr(model, "is_loaded_in_8bit", True) or getattr(
-            model, "is_loaded_in_4bit", True
-        ):
-            # Quantized models: use the device of the input embeddings.
-            # This is robust even when the model is sharded across devices.
-            self.device = model.get_input_embeddings().weight.device
-        elif device is not None:
-            # Non-quantized models: use the model's (target) device you already chose.
-            self.device = device
-        else:
-            (
-                device
-                if device is not None
-                else ("cuda" if torch.cuda.is_available() else "cpu")
-            )
+        self.device = _input_device(model, device)
         self.dtype = dtype
 
         # ---------------------- parameter snapshots --------------------------- #
@@ -926,9 +930,7 @@ class ScoreAPILoss(torch.nn.Module):
         tokenizer,
         gen_cfg,
     ) -> None:
-        if getattr(model, "is_loaded_in_8bit", False) or getattr(
-            model, "is_loaded_in_4bit", False
-        ):
+        if _is_quantized(model):
             self._model = model
         else:
             self._model = model.to(self.device, dtype=self.dtype)
@@ -941,12 +943,7 @@ class ScoreAPILoss(torch.nn.Module):
             else self._tokenizer.eos_token_id
         )
 
-        if getattr(model, "is_loaded_in_8bit", True) or getattr(
-            model, "is_loaded_in_4bit", True
-        ):
-            self.device = model.get_input_embeddings().weight.device
-        elif self.device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = _input_device(model, self.device)
 
         self._enc = {k: v.to(self.device) for k, v in enc.items()}
         self._prompt = prompt
@@ -1144,9 +1141,7 @@ class SemgrepLoss(nn.Module):
         gen_cfg,
     ) -> None:
         """Set the per-step context required for `forward()`."""
-        if getattr(model, "is_loaded_in_8bit", False) or getattr(
-            model, "is_loaded_in_4bit", False
-        ):
+        if _is_quantized(model):
             self._model = model
         else:
             self._model = model.to(self.device, dtype=self.dtype)
@@ -1159,12 +1154,7 @@ class SemgrepLoss(nn.Module):
             else self._tokenizer.eos_token_id
         )
 
-        if getattr(model, "is_loaded_in_8bit", True) or getattr(
-            model, "is_loaded_in_4bit", True
-        ):
-            self.device = model.get_input_embeddings().weight.device
-        elif self.device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = _input_device(model, self.device)
 
         self._enc = {k: v.to(self.device) for k, v in enc.items()}
         self._prompt_len = self._enc["input_ids"].shape[1]
