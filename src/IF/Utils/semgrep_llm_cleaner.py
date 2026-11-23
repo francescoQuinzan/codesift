@@ -108,6 +108,9 @@ def _guess_filename_from_snippet(snippet: str) -> Optional[str]:
 def _unique_filename(directory: str, base: str, ext: str = ".py") -> str:
     """Return a path that does not clash with an existing file in directory."""
     base = re.sub(r"[^\w\-.]", "_", base) or "snippet"
+    # A filename hint such as "foo.py" already carries the extension.
+    if ext and base.endswith(ext):
+        base = base[: -len(ext)] or "snippet"
     candidate = f"{base}{ext}"
     i = 1
     while os.path.exists(os.path.join(directory, candidate)):
