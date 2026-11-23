@@ -236,25 +236,23 @@ def resolve_keep_layers(model, spec):
     return layers
 
 
-def quarter_layer_pattern(model, gm_for_check=None):
+def quarter_layer_pattern(model, available_layers=None):
     """Regex name_pattern for A2.5a/A2.5b: MLP up/down proj weights at the
     quarter-point layers of the model, e.g. (0|8|16|24) for 32 layers.
-    Cross-checks the indices against gm.get_model_layer_indices() if available.
+    Cross-checks the indices against `available_layers` (the result of
+    gm.get_model_layer_indices() from a ladder row) if given.
     """
     quarter_idxs = quarter_layer_indices(model)
 
-    if gm_for_check is not None and hasattr(gm_for_check, "get_model_layer_indices"):
-        try:
-            available = set(gm_for_check.get_model_layer_indices())
-            missing = [i for i in quarter_idxs if i not in available]
-            if missing:
-                print(
-                    f"[warn] quarter-point layer indices {missing} not found among "
-                    f"gm.get_model_layer_indices()={sorted(available)}; double-check "
-                    f"the layer naming before trusting A2.5a/A2.5b results."
-                )
-        except Exception as e:
-            print(f"[warn] could not verify layer indices via get_model_layer_indices(): {e}")
+    if available_layers is not None:
+        available = set(available_layers)
+        missing = [i for i in quarter_idxs if i not in available]
+        if missing:
+            print(
+                f"[warn] quarter-point layer indices {missing} not found among "
+                f"gm.get_model_layer_indices()={sorted(available)}; double-check "
+                f"the layer naming before trusting A2.5a/A2.5b results."
+            )
 
     idx_pattern = "|".join(str(i) for i in quarter_idxs)
     return rf"model\.layers\.({idx_pattern})\.mlp\.(up_proj|down_proj)\.weight$"
@@ -273,7 +271,7 @@ def build_ignore(model, keep_layers, keep_proj):
     return ignore
 
 
-def get_row_setup(row_name, model, args, keep_layers, gm_for_layer_check=None):
+def get_row_setup(row_name, model, args, keep_layers, available_layers=None):
     """Returns (gm_kwargs, layers, proj_names) for one ablation row."""
     common = dict(small_matrices=False, normalize=True, use_amp=True, rel_eps=args.rel_eps)
 
@@ -297,7 +295,7 @@ def get_row_setup(row_name, model, args, keep_layers, gm_for_layer_check=None):
             use_grad_gram=True,       # forced -- generic path always uses gradient Gram
             use_woodbury=False,       # no effect on this code path
             short_side=o["short_side"],
-            name_pattern=quarter_layer_pattern(model, gm_for_check=gm_for_layer_check),
+            name_pattern=quarter_layer_pattern(model, available_layers=available_layers),
             proj_names=MLP_PROJ,
             min_damping=args.offladder_min_damping,
         )
@@ -447,7 +445,7 @@ def main():
 
     base = args.baseline_row
     all_rows_res, errors = {}, {}
-    last_ladder_gm = None
+    ladder_layer_indices = None
     baseline_blocks, baseline_norms = None, {}
 
     for row_name in args.rows:
@@ -464,7 +462,7 @@ def main():
             row_start = time.perf_counter()
 
             gm_kwargs, layers, proj_names = get_row_setup(
-                row_name, model, args, keep_layers, gm_for_layer_check=last_ladder_gm)
+                row_name, model, args, keep_layers, available_layers=ladder_layer_indices)
             config = PreconditioningConfig(
                 data_size=1,
                 damping=args.damping,
@@ -517,9 +515,11 @@ def main():
             if row_name != base and cmp["n_blocks_compared"] == 0:
                 print(f"[warn] {row_name} shares no blocks with {base}; check the block names.")
 
-            # Keep the most recent ladder gm so A2.5a/A2.5b can cross-check layer indices.
+            # Keep only the layer indices (not the gm itself) so A2.5a/A2.5b can
+            # cross-check them. Holding on to the gm kept its curvature factors
+            # alive, which inflated the later rows' memory readings.
             if row_name in LADDER_ROWS:
-                last_ladder_gm = gm
+                ladder_layer_indices = gm.get_model_layer_indices()
 
         except Exception as e:
             if args.fail_fast:

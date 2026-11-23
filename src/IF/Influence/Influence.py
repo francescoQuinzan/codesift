@@ -178,32 +178,21 @@ class Influences:
             "model_name": self.model.config._name_or_path,
         }
 
-    def __hash__(self):
-        return hash(
-            hash(self.gm),
-            hash(self.get_state()),
-        )
-
     def save(self, path=None):
-        self_hash = self.__hash__()
-        gm_path = (
-            f"{path}_gm.pt"
-            if path
-            else f"influence_gm_{uuid4()}{self_hash}.pt"
-        )
+        # Without an explicit path, save under one fresh id so the gradient-maker
+        # file and the Influences file can be matched up afterwards.
+        if not path:
+            path = f"influence_{uuid4().hex}"
+        gm_path = f"{path}_gm.pt"
         self.gm.save_state(gm_path)
 
-        self_save_path = (
-            f"{path}_influence.pt"
-            if path
-            else f"influence_{uuid4()}{self_hash}.pt"
-        )
+        self_save_path = f"{path}_influence.pt"
         torch.save(self.get_state(), self_save_path)
         print(
             f"Saved Influences state to {self_save_path} and gradient maker state to {gm_path}"
         )
 
     def load_state(self, path):
-        state = torch.load(path)
+        state = torch.load(path, map_location=self.device)
         self.conditioned_grads = state["conditioned_grads"]
         self.epsilon = state["epsilon"]

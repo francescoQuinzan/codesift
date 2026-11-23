@@ -5,10 +5,11 @@ from torch import nn
 from asdl.matrices import SHAPE_KRON
 
 
-__all__ = [
-    "AdvanceKFACGradientMaker",
-    "AdvancedSmallKfacGradientMaker",
-]
+# Everything here is a private helper imported by name; nothing is exported by
+# `from IF.KFAC.matrix_operations import *`. (The old list named two gradient
+# maker classes that are not defined in this module, so a star-import raised
+# AttributeError.)
+__all__ = []
 
 
 _NAME_PAT_MLP = re.compile(r"model\.layers\.(\d+)\.mlp\.(c_fc|c_proj|up_proj|down_proj)\.weight$")
