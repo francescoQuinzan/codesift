@@ -170,7 +170,7 @@ def summarize(runs):
 # Experiment
 # -----------------------------------------------------------------------------
 
-def run_experiment(model, dataset, base_dir):
+def run_experiment(model, dataset, base_dir, seed=None):
     reference_path = base_dir / f"{model}_reference_dataset.pkl"
     malicious_path = base_dir / f"{model}_{dataset}_malicious.pkl"
     output_path = base_dir / f"{model}_{dataset}.pkl"
@@ -184,7 +184,9 @@ def run_experiment(model, dataset, base_dir):
     with open(malicious_path, "rb") as f:
         malicious_data = pickle.load(f)
 
-    rng = np.random.default_rng()
+    # seed=None keeps the previous (non-reproducible) behaviour.
+    rng = np.random.default_rng(seed)
+    print(f"Seed:     {seed}")
     norms = sorted(norm_names(reference_data) & norm_names(malicious_data))
     results = {}
 
@@ -216,7 +218,7 @@ def run_experiment(model, dataset, base_dir):
             print(f"Checkpoint saved (N_samples={n_samples}, norm={norm})", flush=True)
 
 
-def launch_all(base_dir):
+def launch_all(base_dir, seed=None):
     """Start one background run per model/dataset pair, each logging to its own file.
 
     Runs keep going after the terminal closes (like `nohup ... &`).
@@ -227,7 +229,8 @@ def launch_all(base_dir):
             with open(log_path, "w") as log:
                 subprocess.Popen(
                     [sys.executable, __file__, "--model", model, "--dataset", dataset,
-                     "--base-dir", str(base_dir)],
+                     "--base-dir", str(base_dir)]
+                    + ([] if seed is None else ["--seed", str(seed)]),
                     stdout=log,
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
@@ -241,6 +244,9 @@ def main():
     parser.add_argument("--dataset", help="e.g. auth, infrastructure, injection. Omit to launch all pairs.")
     parser.add_argument("--base-dir", default=DEFAULT_BASE_DIR,
                         help="Directory with the input and output pickle files (default: %(default)s)")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed for the bootstrap and sampling RNG, for reproducible results "
+                             "(default: unseeded, as before)")
     args = parser.parse_args()
 
     if (args.model is None) != (args.dataset is None):
@@ -248,9 +254,9 @@ def main():
 
     base_dir = Path(args.base_dir)
     if args.model is None:
-        launch_all(base_dir)
+        launch_all(base_dir, args.seed)
     else:
-        run_experiment(args.model, args.dataset, base_dir)
+        run_experiment(args.model, args.dataset, base_dir, args.seed)
 
 
 if __name__ == "__main__":
