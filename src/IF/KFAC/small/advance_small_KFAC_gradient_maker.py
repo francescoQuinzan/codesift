@@ -537,6 +537,9 @@ class AdvancedSmallKfacGradientMaker(NaturalGradientMaker):
                     gW_mat = gW.flatten(start_dim=1)
                 else:
                     gW_mat = gW
+                # Factors are accumulated in float32; a half-precision gradient
+                # would make the matmuls below fail with a dtype mismatch.
+                gW_mat = gW_mat.to(dtype=A_avg.dtype)
 
                 if self.short_side:
                     if gW_mat.shape[1] <= gW_mat.shape[0]:
@@ -552,17 +555,9 @@ class AdvancedSmallKfacGradientMaker(NaturalGradientMaker):
                     L_G, _ = _chol_with_adaptive_damping(G_avg, lam_G)
                     A_inv = _chol_inv(L_A)
                     G_inv = _chol_inv(L_G)
-                    # assert that all tensors have the same dtype before matmul
-                    try:
-                        assert A_inv.dtype == gW_mat.dtype == G_inv.dtype
-                    except AssertionError:
-                        print(
-                            f"Warning: dtype mismatch among A_inv ({A_inv.dtype}), gW_mat ({gW_mat.dtype}), and G_inv ({G_inv.dtype}). Ensure that Model (and thus its perametors) are being cast to a consistent dtype."
-                        )
-
                     gW_new = G_inv @ gW_mat @ A_inv
 
-                p.grad.copy_(gW_new.view_as(gW).to(p.grad.device))
+                self._set_precond_grad(p, gW_new.view_as(gW).to(p.grad.device))
 
     def _init_kfac_syncer(self, kfac_sync_kwargs):
         kwargs = {} if kfac_sync_kwargs is None else dict(kfac_sync_kwargs)
@@ -1137,8 +1132,9 @@ class AdvancedSmallKfacGradientMaker(NaturalGradientMaker):
         if W_u.grad is None or W_d.grad is None:
             return
         factor_device = cache["L_Au_damped"].device
-        gW_d = W_d.grad.to(factor_device)
-        gW_u = W_u.grad.to(factor_device)
+        factor_dtype = cache["L_Au_damped"].dtype
+        gW_d = W_d.grad.to(factor_device, dtype=factor_dtype)
+        gW_u = W_u.grad.to(factor_device, dtype=factor_dtype)
         Au_inv = _chol_inv(cache["L_Au_damped"])
         Gd_inv = _chol_inv(cache["L_Gd_damped"])
         gW_d_new = Gd_inv @ gW_d
@@ -1249,7 +1245,7 @@ class AdvancedSmallKfacGradientMaker(NaturalGradientMaker):
         if W.grad is None:
             return
         factor_device = cache["L_Au_damped"].device
-        gW = W.grad.to(factor_device)
+        gW = W.grad.to(factor_device, dtype=cache["L_Au_damped"].dtype)
         Au_inv = _chol_inv(cache["L_Au_damped"])
         Gd_inv = _chol_inv(cache["L_Gd_damped"])
         gW_new = Gd_inv @ gW @ Au_inv
