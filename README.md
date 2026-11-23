@@ -73,6 +73,13 @@ Install in **editable mode** (`-e`): default paths such as `results/` and `semgr
 `pip install -e .` installs only the core library. `[all]` installs everything.
 </details>
 
+To check the installation, run the CPU smoke tests (no GPU or downloads needed; a few seconds):
+
+```bash
+pip install -e ".[test]"
+pytest tests/
+```
+
 ---
 
 ## Data

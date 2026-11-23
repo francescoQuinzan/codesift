@@ -35,6 +35,10 @@ experiments = [
     "scikit-learn",
     "scipy",
 ]
+# CPU smoke tests in tests/
+test = [
+    "pytest",
+]
 all = [
     "influence-functions[data,quant,experiments]",
 ]
