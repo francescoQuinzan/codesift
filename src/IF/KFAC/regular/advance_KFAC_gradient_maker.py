@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.distributed as dist
+from torch.nn.utils import parameters_to_vector, vector_to_parameters
 
 from asdl.precondition  import PreconditioningConfig,NaturalGradientMaker
 from asdl.fisher import  LOSS_CROSS_ENTROPY
@@ -13,10 +14,10 @@ from asdl.matrices import *
 from asdl.symmatrix import *
 from asdl.fisher import FISHER_MC, LOSS_CROSS_ENTROPY
 
-from IF.KFAC.matrix_operations import (
-    _bias_requires_grad,
-    __all__,
-)
+# Private in asdl, so `from asdl.matrices import *` does not provide it.
+from asdl.precondition.natural_gradient import _module_level_shapes
+
+from IF.KFAC.matrix_operations import _bias_requires_grad
 
 
 class AdvanceKFACGradientMaker(NaturalGradientMaker):
