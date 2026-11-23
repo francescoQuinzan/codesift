@@ -1458,6 +1458,14 @@ class AdvancedSmallKfacGradientMaker(NaturalGradientMaker):
                 for k, v in self.G_qkv_dict.items()
             },
             "qkv_counts": dict(self.qkv_counts),
+            # Factors used by the generic path (_use_generic_precond()).
+            "param_A": {
+                k: v.cpu() if v is not None else None for k, v in self._param_A.items()
+            },
+            "param_G": {
+                k: v.cpu() if v is not None else None for k, v in self._param_G.items()
+            },
+            "param_counts": dict(self._param_counts),
         }
         torch.save(state, path)
         print(f"Saved K-FAC state to {path}")
@@ -1490,4 +1498,14 @@ class AdvancedSmallKfacGradientMaker(NaturalGradientMaker):
                 else None
             )
         self.qkv_counts.update(state["qkv_counts"])
+        # Older state files have no generic-path factors.
+        for k, v in state.get("param_A", {}).items():
+            self._param_A[k] = (
+                v.to(self._device_for_key(k, v.device)) if v is not None else None
+            )
+        for k, v in state.get("param_G", {}).items():
+            self._param_G[k] = (
+                v.to(self._device_for_key(k, v.device)) if v is not None else None
+            )
+        self._param_counts.update(state.get("param_counts", {}))
         print(f"Loaded K-FAC state from {path}")
