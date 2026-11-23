@@ -46,13 +46,25 @@ def naive_semgrep(code: str) -> int:
     `clean_and_save` writes the snippet to temporary .py file(s); only the
     first file is scanned (as in the original implementation).
     """
-    for code_file in clean_and_save(code):
-        proc = subprocess.run(
-            ["semgrep", "--config", SEMGREP_RULES_DIR, "--json", code_file],
-            capture_output=True, text=True, timeout=180,
-        )
-        os.remove(code_file)
-        return len(json.loads(proc.stdout)["results"])
+    code_files = clean_and_save(code)
+    try:
+        for code_file in code_files:
+            proc = subprocess.run(
+                ["semgrep", "--config", SEMGREP_RULES_DIR, "--json", code_file],
+                capture_output=True, text=True, timeout=180,
+            )
+            return len(json.loads(proc.stdout)["results"])
+    finally:
+        # Remove every file clean_and_save wrote (not only the scanned one),
+        # and its temporary directory.
+        for code_file in code_files:
+            if os.path.exists(code_file):
+                os.remove(code_file)
+        if code_files:
+            try:
+                os.rmdir(os.path.dirname(code_files[0]))
+            except OSError:
+                pass
 
 
 # =============================================================================
@@ -66,10 +78,13 @@ def run_bandit(code: str, idx: int = -1) -> int:
         f.write(code)
         tmp_path = f.name
 
-    proc = subprocess.run(
-        ["bandit", "-r", tmp_path, "-f", "json"],
-        capture_output=True, text=True, timeout=30,
-    )
+    try:
+        proc = subprocess.run(
+            ["bandit", "-r", tmp_path, "-f", "json"],
+            capture_output=True, text=True, timeout=30,
+        )
+    finally:
+        os.remove(tmp_path)  # delete=False above, so clean up ourselves
     return len(json.loads(proc.stdout).get("results", []))
 
 
@@ -481,8 +496,12 @@ def main():
 
     data = run_detectors(data)
 
-    with open(path, "wb") as f:
+    # Write atomically: the pickle holds all the influence results, so a crash
+    # or Ctrl-C half-way through the dump must not leave it truncated.
+    tmp = path + ".tmp"
+    with open(tmp, "wb") as f:
         pickle.dump(data, f)
+    os.replace(tmp, path)
 
 
 if __name__ == "__main__":
