@@ -15,7 +15,8 @@ class ModelTrainingDatasetEstimate:
     def load_dataset(self):
         ds = load_dataset("wikimedia/wikipedia", "20231101.en")
         ds = ds["train"]
-        ds = ds.shuffle(seed=self.seed).select(range(100))
+        n = min(self.random_selection_size, len(ds))
+        ds = ds.shuffle(seed=self.seed).select(range(n))
         return ds
 
     def findTop(self, query, k=5):
@@ -26,10 +27,8 @@ class ModelTrainingDatasetEstimate:
         ids = self.ds["id"]
         texts = self.ds["text"]
 
-        # 2) Embed in batches
-        model = SentenceTransformer(
-            "all-MiniLM-L6-v2"
-        )  # small & fast; swap for larger if needed
+        # 2) Embed in batches with the encoder chosen in __init__
+        model = self.model
 
         batch_size = 64
         embs = []
