@@ -794,17 +794,12 @@ class Semgrep(LossWrapper):
         num_matches_list = []
 
         for response in responses:
-            # Save the response code to a temporary Python file
-            code_file = os.path.join(self.temp_dir, "temp_code.py")
-            with open(code_file, "w") as f:
-                f.write(response)
-
+            # clean_and_save() writes one cleaned file per code block.
             code_file_path = clean_and_save(response)
 
-            # Run Semgrep on the generated files
+            # Count matches over *all* files of this response.
+            num_matches = 0
             for code_file in code_file_path:
-                num_matches = 0
-
                 proc = subprocess.run(
                     ["semgrep", "--config", self.rule_path, "--json", code_file],
                     capture_output=True,
@@ -812,16 +807,15 @@ class Semgrep(LossWrapper):
                     timeout=10,
                 )
                 res = json.loads(proc.stdout)
-                output = res["results"]
+                output = res.get("results", [])
 
                 # Remove temporary Python file immediately
                 os.remove(code_file)
 
                 # Raise an error if the Semgrep rule was invalid
-                if "errors" in output and len(output["errors"]) > 0:
-                    for err in output.get("errors", []):
-                        if err.get("type") == "SemgrepError":
-                            raise RuntimeError("invalid rule")
+                for err in res.get("errors", []):
+                    if err.get("type") == "SemgrepError":
+                        raise RuntimeError("invalid rule")
 
                 # Count the number of matches found by Semgrep
                 num_matches += -len(output)
